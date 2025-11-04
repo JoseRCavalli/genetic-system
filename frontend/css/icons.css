@@ -1,0 +1,65 @@
+/* ============================================================================
+   ÍCONES - Lordicon + FontAwesome
+   ============================================================================ */
+
+/* Carregar Lordicon */
+@import url('https://cdn.lordicon.com/lordicon.js');
+
+/* Carregar FontAwesome */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+/* ============================================================================
+   ESTILOS PARA ÍCONES LORDICON
+   ============================================================================ */
+
+.lordicon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lordicon-small {
+    width: 32px;
+    height: 32px;
+}
+
+.lordicon-medium {
+    width: 48px;
+    height: 48px;
+}
+
+.lordicon-large {
+    width: 64px;
+    height: 64px;
+}
+
+.lordicon-xl {
+    width: 96px;
+    height: 96px;
+}
+
+/* ============================================================================
+   ESTILOS PARA FONTAWESOME
+   ============================================================================ */
+
+.fa-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fa-icon.small {
+    font-size: 1rem;
+}
+
+.fa-icon.medium {
+    font-size: 1.5rem;
+}
+
+.fa-icon.large {
+    font-size: 2rem;
+}
+
+.fa-icon.xl {
+    font-size: 3rem;
+}

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acasalamento Manual - Genefy</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        .search-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .search-box {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .search-box h3 {
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        
+        .animal-card {
+            padding: 1rem;
+            background: var(--gray-50);
+            border-radius: var(--radius);
+            border: 2px solid var(--gray-200);
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 0.75rem;
+        }
+        
+        .animal-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+        
+        .animal-card.selected {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .result-section {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .score-display {
+            text-align: center;
+            padding: 2rem;
+            margin: 2rem 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: var(--radius-lg);
+            color: white;
+        }
+        
+        .score-display h2 {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .pppv-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .pppv-card {
+            padding: 1rem;
+            background: var(--gray-50);
+            border-radius: var(--radius);
+            text-align: center;
+        }
+        
+        .pppv-card .label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .pppv-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        @media (max-width: 768px) {
+            .search-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="ph ph-cow" style="font-size: 2rem; font-weight: bold;"></i>
+                <span class="brand-text">Genefy - Genética Bovina</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/manual" class="active">Acasalamento Manual</a></li>
+                <li><a href="/batch">Acasalamento em Lote</a></li>
+                <li><a href="/history">Histórico</a></li>
+                <li><a href="/analytics">Análises</a></li>
+                <li><a href="/import">Importar Dados</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>
+                <i class="ph ph-target" style="margin-right: 0.5rem; font-size: 3rem; vertical-align: middle;"></i>
+                Acasalamento Manual
+            </h1>
+            <p>Escolha uma fêmea e um touro para analisar o acasalamento</p>
+        </header>
+
+        <!-- Seção de Busca -->
+        <section class="search-section">
+            <!-- Buscar Fêmea -->
+            <div class="search-box">
+                <h3>
+                    <i class="ph-fill ph-cow" style="font-size: 1.5rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                    1. Selecione a Fêmea
+                </h3>
+                <div class="form-group">
+                    <input type="text" id="female-search" class="form-control" 
+                           placeholder="Buscar por ID ou nome...">
+                </div>
+                <div id="female-list" style="max-height: 400px; overflow-y: auto;">
+                    <p class="empty-state">Digite para buscar...</p>
+                </div>
+            </div>
+
+            <!-- Buscar Touro -->
+            <div class="search-box">
+                <h3>
+                    <i class="ph-fill ph-dna" style="color: #e83a30; font-size: 1.5rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                    2. Selecione o Touro
+                </h3>
+                <div class="form-group">
+                    <input type="text" id="bull-search" class="form-control" 
+                           placeholder="Buscar por código ou nome...">
+                </div>
+                <div id="bull-list" style="max-height: 400px; overflow-y: auto;">
+                    <p class="empty-state">Digite para buscar...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Botão Analisar -->
+        <div style="text-align: center; margin: 2rem 0;">
+            <button id="analyze-btn" class="btn btn-primary btn-lg" 
+                    style="font-size: 1.25rem; padding: 1rem 3rem;" disabled>
+                <i class="ph ph-microscope" style="margin-right: 0.5rem; font-size: 1.5rem; vertical-align: middle;"></i>
+                Analisar Acasalamento
+            </button>
+        </div>
+
+        <!-- Resultado -->
+        <div id="result-section" style="display: none;">
+            <section class="result-section">
+                <h2>
+                    <i class="ph ph-chart-bar" style="font-size: 1.75rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                    Resultado da Análise
+                </h2>
+                
+                <!-- Score de Compatibilidade -->
+                <div class="score-display">
+                    <h2 id="compatibility-score">-</h2>
+                    <p id="compatibility-grade">-</p>
+                </div>
+
+                <!-- PPPV -->
+                <h3>
+                    <i class="ph ph-dna" style="font-size: 1rem; font-weight: bold;"></i>
+                     PPPV (Predicted Producing Value)
+                </h3>
+                <div class="pppv-grid" id="pppv-grid">
+                    <!-- Será preenchido dinamicamente -->
+                </div>
+
+                <!-- Consanguinidade -->
+                <div class="alert" id="inbreeding-alert">
+                    <h4>
+                        <i class="ph ph-dna" style="font-size: 1rem; font-weight: bold;"></i>
+                        Consanguinidade
+                    </h4>
+                    <p id="inbreeding-text">-</p>
+                </div>
+
+                <!-- Recomendação -->
+                <div class="alert" id="recommendation-alert">
+                    <h4>
+                        <i class="ph ph-lightbulb" style="font-size: 1rem; font-weight: bold;"></i>
+                         Recomendação
+                    </h4>
+                    <p id="recommendation-text">-</p>
+                </div>
+
+                <!-- Salvar -->
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button id="save-btn" class="btn btn-success" style="font-size: 1.1rem; padding: 0.75rem 2rem;">
+                        <i class="ph ph-floppy-disk" style="font-size: 1rem; font-weight: bold;"></i>
+                        Salvar no Histórico
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>Sistema de Acasalamento - Gado Leiteiro &copy; 2025</p>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let selectedFemale = null;
+        let selectedBull = null;
+        let lastResult = null;
+
+        // Buscar fêmeas
+        const femaleSearch = document.getElementById('female-search');
+        const femaleList = document.getElementById('female-list');
+        
+        femaleSearch.addEventListener('input', async (e) => {
+            const query = e.target.value.trim();
+            if (query.length < 2) {
+                femaleList.innerHTML = '<p class="empty-state">Digite pelo menos 2 caracteres...</p>';
+                return;
+            }
+            
+            try {
+                const data = await API.getFemales({ search: query, per_page: 20 });
+                if (data.females.length === 0) {
+                    femaleList.innerHTML = '<p class="empty-state">Nenhuma fêmea encontrada</p>';
+                    return;
+                }
+                
+                femaleList.innerHTML = data.females.map(f => `
+                    <div class="animal-card" onclick="selectFemale(${f.id}, '${f.reg_id || f.internal_id}', '${f.name || '-'}')">
+                        <strong>${f.reg_id || f.internal_id}</strong><br>
+                        <small>${f.name || 'Sem nome'}</small>
+                    </div>
+                `).join('');
+            } catch (error) {
+                femaleList.innerHTML = '<p class="empty-state">Erro ao buscar</p>';
+            }
+        });
+
+        // Buscar touros
+        const bullSearch = document.getElementById('bull-search');
+        const bullList = document.getElementById('bull-list');
+        
+        bullSearch.addEventListener('input', async (e) => {
+            const query = e.target.value.trim();
+            if (query.length < 2) {
+                bullList.innerHTML = '<p class="empty-state">Digite pelo menos 2 caracteres...</p>';
+                return;
+            }
+            
+            try {
+                const data = await API.getBulls({ search: query, per_page: 20 });
+                if (data.bulls.length === 0) {
+                    bullList.innerHTML = '<p class="empty-state">Nenhum touro encontrado</p>';
+                    return;
+                }
+                
+                bullList.innerHTML = data.bulls.map(b => `
+                    <div class="animal-card" onclick="selectBull(${b.id}, '${b.code}', '${b.name || '-'}')">
+                        <strong>${b.code}</strong><br>
+                        <small>${b.name || 'Sem nome'}</small>
+                    </div>
+                `).join('');
+            } catch (error) {
+                bullList.innerHTML = '<p class="empty-state">Erro ao buscar</p>';
+            }
+        });
+
+        function selectFemale(id, code, name) {
+            selectedFemale = { id, code, name };
+            document.querySelectorAll('#female-list .animal-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.animal-card').classList.add('selected');
+            checkCanAnalyze();
+        }
+
+        function selectBull(id, code, name) {
+            selectedBull = { id, code, name };
+            document.querySelectorAll('#bull-list .animal-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.animal-card').classList.add('selected');
+            checkCanAnalyze();
+        }
+
+        function checkCanAnalyze() {
+            document.getElementById('analyze-btn').disabled = !(selectedFemale && selectedBull);
+        }
+
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loading-spinner"></div> Analisando...';
+                
+                const result = await API.createManualMating(selectedFemale.id, selectedBull.id, false);
+                lastResult = result;
+                
+                displayResult(result);
+                
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-microscope" style="margin-right: 0.5rem;"></i> Analisar Acasalamento';
+            } catch (error) {
+                showError('Erro ao analisar: ' + error.message);
+                document.getElementById('analyze-btn').disabled = false;
+                document.getElementById('analyze-btn').innerHTML = '<i class="ph ph-microscope" style="margin-right: 0.5rem;"></i> Analisar Acasalamento';
+            }
+        });
+
+        function displayResult(result) {
+            const comp = result.analysis.compatibility;
+            const inb = result.analysis.inbreeding;
+            const pppv = result.analysis.pppv;
+            
+            // Score
+            document.getElementById('compatibility-score').textContent = comp.score.toFixed(1);
+            document.getElementById('compatibility-grade').textContent = comp.grade;
+            
+            // PPPV
+            const pppvGrid = document.getElementById('pppv-grid');
+            const mainIndices = ['milk', 'protein', 'fat', 'productive_life', 'fertility_index', 'udc'];
+            pppvGrid.innerHTML = mainIndices.filter(idx => pppv[idx]).map(idx => `
+                <div class="pppv-card">
+                    <div class="label">${idx.toUpperCase()}</div>
+                    <div class="value">${pppv[idx].pppv}</div>
+                </div>
+            `).join('');
+            
+            // Consanguinidade
+            const inbAlert = document.getElementById('inbreeding-alert');
+            inbAlert.className = 'alert alert-' + (inb.expected_inbreeding <= 6 ? 'success' : 'warning');
+            document.getElementById('inbreeding-text').textContent = 
+                `Consanguinidade esperada: ${inb.expected_inbreeding.toFixed(2)}% - ${inb.recommendation}`;
+            
+            // Recomendação
+            const recAlert = document.getElementById('recommendation-alert');
+            const rec = result.recommendation;
+            recAlert.className = 'alert alert-' + (rec.color === 'green' ? 'success' : rec.color === 'red' ? 'danger' : 'info');
+            document.getElementById('recommendation-text').textContent = rec.message;
+            
+            document.getElementById('result-section').style.display = 'block';
+            document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        document.getElementById('save-btn').addEventListener('click', async () => {
+            if (!lastResult) return;
+            
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loading-spinner"></div> Salvando...';
+                
+                await API.createManualMating(selectedFemale.id, selectedBull.id, true);
+                
+                showSuccess('Acasalamento salvo no histórico!');
+                btn.innerHTML = '<i class="ph ph-check-circle" style="margin-right: 0.5rem;"></i> Salvo!';
+                
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ph ph-floppy-disk" style="margin-right: 0.5rem;"></i> Salvar no Histórico';
+                }, 2000);
+            } catch (error) {
+                showError('Erro ao salvar: ' + error.message);
+                document.getElementById('save-btn').disabled = false;
+                document.getElementById('save-btn').innerHTML = '<i class="ph ph-floppy-disk" style="margin-right: 0.5rem;"></i> Salvar no Histórico';
+            }
+        });
+    </script>
+</body>
+</html>

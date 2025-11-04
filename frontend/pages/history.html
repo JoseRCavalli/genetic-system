@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico - Genefy</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="ph ph-cow" style="font-size: 2rem; font-weight: bold;"></i>
+                <span class="brand-text">Genefy - Genética Bovina</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/manual">Acasalamento Manual</a></li>
+                <li><a href="/batch">Acasalamento em Lote</a></li>
+                <li><a href="/history" class="active">Histórico</a></li>
+                <li><a href="/analytics">Análises</a></li>
+                <li><a href="/import">Importar Dados</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>
+                <i class="ph ph-clock-counter-clockwise" style="margin-right: 0.2rem; font-size: 3rem; vertical-align: middle;"></i>
+                Histórico de Acasalamentos
+            </h1>
+            <p>Todos os acasalamentos registrados no sistema</p>
+        </header>
+
+        <section class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Acasalamentos</h2>
+                <div>
+                    <select id="status-filter" class="form-select" style="display: inline-block; width: auto;">
+                        <option value="">Todos os status</option>
+                        <option value="planned">Planejado</option>
+                        <option value="confirmed">Confirmado</option>
+                        <option value="successful">Bem-sucedido</option>
+                        <option value="failed">Falhou</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Fêmea</th>
+                            <th>Touro</th>
+                            <th>Score</th>
+                            <th>Consang.</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matings-table">
+                        <tr><td colspan="7" class="loading">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="pagination" style="text-align: center; margin-top: 1.5rem;"></div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>Sistema de Acasalamento - Gado Leiteiro &copy; 2025</p>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let currentPage = 1;
+        let currentStatus = '';
+
+        async function loadMatings() {
+            try {
+                const params = { page: currentPage, per_page: 20 };
+                if (currentStatus) params.status = currentStatus;
+
+                const data = await API.getMatings(params);
+                renderMatings(data.matings);
+                renderPagination(data.page, data.total_pages);
+            } catch (error) {
+                document.getElementById('matings-table').innerHTML = 
+                    '<tr><td colspan="7" class="empty-state">Erro ao carregar acasalamentos</td></tr>';
+            }
+        }
+
+        function renderMatings(matings) {
+            const tbody = document.getElementById('matings-table');
+            
+            if (matings.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum acasalamento registrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = matings.map(m => `
+                <tr>
+                    <td>${formatDate(m.created_at)}</td>
+                    <td>${m.female_id}</td>
+                    <td>${m.bull_id}</td>
+                    <td><span class="badge badge-${getScoreColor(m.compatibility_score || 0)}">${(m.compatibility_score || 0).toFixed(1)}</span></td>
+                    <td><span class="badge badge-${getInbreedingColor(m.predicted_inbreeding || 0)}">${(m.predicted_inbreeding || 0).toFixed(2)}%</span></td>
+                    <td><span class="badge badge-info">${m.status || 'planned'}</span></td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="viewDetails(${m.id})">Ver</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPagination(page, totalPages) {
+            const container = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            if (page > 1) {
+                html += `<button class="btn btn-secondary" onclick="changePage(${page - 1})">← Anterior</button> `;
+            }
+            html += `<span style="margin: 0 1rem;">Página ${page} de ${totalPages}</span>`;
+            if (page < totalPages) {
+                html += ` <button class="btn btn-secondary" onclick="changePage(${page + 1})">Próxima →</button>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadMatings();
+        }
+
+        document.getElementById('status-filter').addEventListener('change', (e) => {
+            currentStatus = e.target.value;
+            currentPage = 1;
+            loadMatings();
+        });
+
+        async function viewDetails(id) {
+            try {
+                const mating = await API.getMating(id);
+                alert(JSON.stringify(mating, null, 2));
+            } catch (error) {
+                showError('Erro ao carregar detalhes');
+            }
+        }
+
+        loadMatings();
+    </script>
+</body>
+</html>

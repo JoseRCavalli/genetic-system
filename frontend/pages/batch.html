@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acasalamento em Lote - Genefy</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="ph ph-cow" style="font-size: 2rem; font-weight: bold;"></i>
+                <span class="brand-text">Genefy - Genética Bovina</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/">Dashboard</a></li>
+                <li><a href="/manual">Acasalamento Manual</a></li>
+                <li><a href="/batch" class="active">Acasalamento em Lote</a></li>
+                <li><a href="/history">Histórico</a></li>
+                <li><a href="/analytics">Análises</a></li>
+                <li><a href="/import">Importar Dados</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>
+                <i class="ph ph-clipboard-text" style="margin-right: 0.2rem; font-size: 3rem; vertical-align: middle;"></i>
+                Acasalamento em Lote
+            </h1>
+            <p>Encontre os melhores touros para múltiplas fêmeas</p>
+        </header>
+
+        <section class="section">
+            <h2>1. Selecionar Fêmeas</h2>
+            <div class="form-group">
+                <input type="text" id="search" class="form-control" placeholder="Buscar fêmeas...">
+            </div>
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all"></th>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>MILK</th>
+                        </tr>
+                    </thead>
+                    <tbody id="females-table">
+                        <tr><td colspan="4" class="loading">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="pagination-controls"></div>
+            <p id="selected-count" style="margin-top: 1rem;">0 fêmeas selecionadas</p>
+        </section>
+
+        <section class="section">
+            <h2>2. Configurações</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Top N Touros por Fêmea</label>
+                    <input type="number" id="top-n" class="form-control" value="5" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Consanguinidade Máxima (%)</label>
+                    <input type="number" id="max-inb" class="form-control" value="6.0" min="0" max="10" step="0.1">
+                </div>
+            </div>
+            <button id="analyze-btn" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 1rem;" disabled>
+                <i class="ph ph-rocket-launch" style="font-size: 1rem; font-weight: bold;"></i>
+                Analisar Lote
+            </button>
+        </section>
+
+        <div id="results-section" style="display: none;">
+            <section class="section">
+            <h2>
+                <i class="ph ph-chart-bar" style="font-size: 1.75rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                Resultados
+            </h2>
+                <div id="results-container"></div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>Sistema de Acasalamento - Gado Leiteiro &copy; 2025</p>
+    </footer>
+
+    <script src="/js/api.js"></script>
+    <script>
+        let selectedFemales = new Set();
+        let allFemales = [];
+        let currentPage = 1;
+        let totalPages = 1;
+
+        async function loadFemales(page = 1) {
+            try {
+                const search = document.getElementById('search').value;
+                const data = await API.getFemales({ 
+                    per_page: 50,
+                    page: page,
+                    search: search,
+                    active_only: true
+                });
+                
+                allFemales = data.females;
+                currentPage = page;
+                totalPages = data.total_pages || 1;
+                
+                renderFemales(allFemales);
+                renderPagination();
+            } catch (error) {
+                document.getElementById('females-table').innerHTML = 
+                    '<tr><td colspan="4" class="empty-state">Erro ao carregar fêmeas</td></tr>';
+            }
+        }
+
+        function renderFemales(females) {
+            const tbody = document.getElementById('females-table');
+            
+            if (females.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nenhuma fêmea encontrada</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = females.map(f => `
+                <tr>
+                    <td><input type="checkbox" class="female-checkbox" value="${f.id}" ${selectedFemales.has(f.id) ? 'checked' : ''}></td>
+                    <td>${f.reg_id || f.internal_id}</td>
+                    <td>${f.name || '-'}</td>
+                    <td>${f.milk || '-'}</td>
+                </tr>
+            `).join('');
+
+            document.querySelectorAll('.female-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSelected);
+            });
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination-controls');
+            
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '<div style="display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1rem;">';
+            
+            // Botão Anterior
+            if (currentPage > 1) {
+                html += `<button class="btn btn-secondary" onclick="changePage(${currentPage - 1})">← Anterior</button>`;
+            }
+            
+            // Páginas
+            html += `<span style="padding: 0 1rem;">Página ${currentPage} de ${totalPages}</span>`;
+            
+            // Botão Próxima
+            if (currentPage < totalPages) {
+                html += `<button class="btn btn-secondary" onclick="changePage(${currentPage + 1})">Próxima →</button>`;
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadFemales(page);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function updateSelected() {
+            document.querySelectorAll('.female-checkbox:checked').forEach(cb => {
+                selectedFemales.add(parseInt(cb.value));
+            });
+            
+            document.querySelectorAll('.female-checkbox:not(:checked)').forEach(cb => {
+                selectedFemales.delete(parseInt(cb.value));
+            });
+            
+            document.getElementById('selected-count').textContent = 
+                `${selectedFemales.size} fêmeas selecionadas`;
+            document.getElementById('analyze-btn').disabled = selectedFemales.size === 0;
+        }
+
+        document.getElementById('select-all').addEventListener('change', (e) => {
+            document.querySelectorAll('.female-checkbox').forEach(cb => {
+                cb.checked = e.target.checked;
+            });
+            updateSelected();
+        });
+
+        // Busca com delay
+        let searchTimeout;
+        document.getElementById('search').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentPage = 1;
+                loadFemales(1);
+            }, 500);
+        });
+
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loading-spinner"></div> Analisando...';
+
+            try {
+                const femaleIds = Array.from(selectedFemales);
+                const topN = parseInt(document.getElementById('top-n').value);
+                const maxInb = parseFloat(document.getElementById('max-inb').value);
+
+                const result = await API.createBatchMating(femaleIds, { top_n: topN, max_inbreeding: maxInb });
+                displayResults(result);
+            } catch (error) {
+                showError('Erro: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Analisar Lote';
+            }
+        });
+
+        function displayResults(result) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = result.results.map(r => `
+                <div style="background: white; padding: 1.5rem; border-radius: var(--radius); margin-bottom: 1rem; border: 2px solid var(--gray-200);">
+                    <h3>🐮 ${r.female.reg_id || r.female.internal_id} - ${r.female.name || 'Sem nome'}</h3>
+                    <table class="data-table" style="margin-top: 1rem;">
+                        <thead>
+                            <tr><th>Rank</th><th>Touro</th><th>Score</th><th>Consang.</th></tr>
+                        </thead>
+                        <tbody>
+                            ${r.top_bulls.map(b => `
+                                <tr>
+                                    <td>${b.rank}º</td>
+                                    <td><strong>${b.bull.code}</strong><br>${b.bull.name}</td>
+                                    <td><span class="badge badge-${getScoreColor(b.score)}">${b.score.toFixed(1)}</span></td>
+                                    <td><span class="badge badge-${getInbreedingColor(b.inbreeding.expected_inbreeding)}">${b.inbreeding.expected_inbreeding.toFixed(2)}%</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+
+            document.getElementById('results-section').style.display = 'block';
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Carregar primeira página
+        loadFemales(1);
+    </script>
+</body>
+</html>

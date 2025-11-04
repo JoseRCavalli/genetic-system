@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Genefy</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <!-- Navegação -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="ph ph-cow" style="font-size: 2rem; font-weight: bold;"></i>
+                <span class="brand-text">Genefy - Genética Bovina</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/" class="active">Dashboard</a></li>
+                <li><a href="/manual">Acasalamento Manual</a></li>
+                <li><a href="/batch">Acasalamento em Lote</a></li>
+                <li><a href="/history">Histórico</a></li>
+                <li><a href="/analytics">Análises</a></li>
+                <li><a href="/import">Importar Dados</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Conteúdo Principal -->
+    <main class="container">
+        <header class="page-header">
+            <h1>
+                <i class="ph ph-trend-up" style="font-size: 3rem; margin-right: 0.2rem; vertical-align: middle;"></i>
+                Dashboard
+            </h1>
+            <p>Visão geral do rebanho e acasalamentos</p>
+        </header>
+
+        <!-- Cards de Estatísticas -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <i class="ph-fill ph-cow stat-icon-phosphor"></i>
+                <div class="stat-content">
+                    <h3 id="total-females">-</h3>
+                    <p>Fêmeas Totais</p>
+                    <span class="stat-detail" id="active-females">- ativas</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <i class="ph-fill ph-dna stat-icon-phosphor"></i>
+                <div class="stat-content">
+                    <h3 id="total-bulls">-</h3>
+                    <p>Touros Disponíveis</p>
+                    <span class="stat-detail" id="available-bulls">- disponíveis</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <i class="ph-fill ph-list-heart stat-icon-phosphor"></i>
+                <div class="stat-content">
+                    <h3 id="total-matings">-</h3>
+                    <p>Acasalamentos</p>
+                    <span class="stat-detail" id="recent-matings">- nos últimos 30 dias</span>
+                </div>
+            </div>
+
+            <div class="stat-card success">
+                <i class="ph-fill ph-check-square stat-icon-phosphor"></i>
+                <div class="stat-content">
+                    <h3 id="success-rate">-%</h3>
+                    <p>Taxa de Sucesso</p>
+                    <span class="stat-detail">Acasalamentos bem-sucedidos</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ações Rápidas -->
+        <section class="section">
+            <h2>
+                <i class="ph ph-lightning" style="font-size: 1.5rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                Ações Rápidas
+            </h2>
+            <div class="quick-actions-grid">
+                <a href="/manual" class="quick-action-card">
+                    <i class="ph-duotone ph-target"></i>
+                    <h3>Acasalamento Manual</h3>
+                    <p>Escolha uma fêmea e um touro específico</p>
+                </a>
+                <a href="/batch" class="quick-action-card">
+                    <i class="ph-duotone ph-clipboard-text"></i>
+                    <h3>Acasalamento em Lote</h3>
+                    <p>Encontre os melhores touros para múltiplas fêmeas</p>
+                </a>
+                <a href="/import" class="quick-action-card">
+                    <i class="ph-duotone ph-download-simple"></i>
+                    <h3>Importar Dados</h3>
+                    <p>Atualize fêmeas e touros</p>
+                </a>
+                <a href="/analytics" class="quick-action-card">
+                    <i class="ph-duotone ph-chart-bar"></i>
+                    <h3>Análises e Gráficos</h3>
+                    <p>Visualize estatísticas detalhadas</p>
+                </a>
+            </div>
+        </section>
+
+        <!-- Top Touros Mais Usados -->
+        <section class="section">
+            <h2>
+                <i class="ph ph-trophy" style="font-size: 1.5rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                Top Touros Mais Usados
+            </h2>
+            <div class="top-bulls-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Ranking</th>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Uso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="top-bulls-table">
+                        <tr>
+                            <td colspan="4" class="empty-state">Carregando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Médias Genéticas do Rebanho -->
+        <section class="section">
+            <h2>
+                <i class="ph ph-chart-bar" style="font-size: 1.5rem; margin-right: 0.5rem; vertical-align: middle;"></i>
+                Médias Genéticas do Rebanho
+            </h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">MILK (lbs)</div>
+                    <div class="metric-value" id="avg-milk">-</div>
+                    <div class="metric-bar">
+                        <div class="metric-fill" id="bar-milk"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Vida Produtiva</div>
+                    <div class="metric-value" id="avg-pl">-</div>
+                    <div class="metric-bar">
+                        <div class="metric-fill" id="bar-pl"></div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-label">Consanguinidade (%)</div>
+                    <div class="metric-value" id="avg-inb">-</div>
+                    <div class="metric-bar">
+                        <div class="metric-fill warning" id="bar-inb"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <section class="section">
+            <div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Sistema de Acasalamento - Gado Leiteiro &copy; 2025</p>
+        <p>Última atualização: <span id="last-update">-</span></p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/pages/dashboard.js"></script>
+</body>
+</html>
