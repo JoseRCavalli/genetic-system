@@ -96,7 +96,19 @@ def analytics():
 @app.route('/import')
 def import_data():
     """Página de importação de dados"""
-    return render_template('import.html')
+    return send_from_directory('frontend/pages', 'import.html')
+
+
+@app.route('/femeas')
+def femeas():
+    """Página de listagem de fêmeas"""
+    return send_from_directory('frontend/pages', 'femeas.html')
+
+
+@app.route('/touros')
+def touros():
+    """Página de listagem de touros"""
+    return send_from_directory('frontend/pages', 'touros.html')
 
 
 # ============================================================================
@@ -291,6 +303,10 @@ if __name__ == '__main__':
     
     # Pegar porta do ambiente (Railway usa variável PORT)
     port = int(os.environ.get('PORT', 5000))
+    
+    print(f"Porta: {port}")
+    print(f"Host: 0.0.0.0")
+    print("\n" + "="*80 + "\n")
     
     # Rodar servidor
     app.run(
