@@ -287,18 +287,14 @@ if __name__ == '__main__':
     print(f"Uploads: {app.config['UPLOAD_FOLDER']}")
     print(f"\nIniciando servidor...")
     print(f"Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
-    print(f"\nAcesse no navegador:")
-    print(f"  → http://localhost:5000")
-    print(f"\nAPI:")
-    print(f"  → http://localhost:5000/api/status")
-    print(f"  → http://localhost:5000/api/health")
-    print(f"\nPressione Ctrl+C para parar o servidor")
     print("="*80 + "\n")
+    
+    # Pegar porta do ambiente (Railway usa variável PORT)
+    port = int(os.environ.get('PORT', 5000))
     
     # Rodar servidor
     app.run(
         host='0.0.0.0',
-        port=5000,
-        debug=True,
-        use_reloader=True
+        port=port,
+        debug=False  # IMPORTANTE: False em produção!
     )
