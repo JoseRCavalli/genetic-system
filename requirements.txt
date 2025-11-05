@@ -1,22 +1,13 @@
-# Backend Core
 Flask==3.0.0
-flask-cors==4.0.0
-
-# Banco de Dados
+Flask-Cors==4.0.0
 SQLAlchemy==2.0.23
-Flask-SQLAlchemy==3.1.1
-
-# Processamento de Dados
-pandas==2.1.3
-numpy==1.26.2
+pandas==2.1.4
 openpyxl==3.1.2
 PyPDF2==3.0.1
+```
 
-# Utilidades
-python-dateutil==2.8.2
-pytz==2023.3
-Werkzeug==3.0.1
+### 2️⃣ **Verifique se tem `Procfile`**
 
-# Desenvolvimento (opcional)
-pytest==7.4.3
-python-dotenv==1.0.0
+Crie um arquivo `Procfile` (sem extensão) na raiz:
+```
+web: python app.py
