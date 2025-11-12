@@ -139,6 +139,38 @@ def dashboard_api():
             "taxa_sucesso": 0
         }), 500
 
+@app.route('/api/init-database')
+def init_database_api():
+    """Inicializar banco PostgreSQL (criar todas as tabelas)"""
+    try:
+        print("🔧 Inicializando banco PostgreSQL...")
+        
+        # Importar models
+        from backend.models.database import Base
+        
+        # Criar todas as tabelas
+        Base.metadata.create_all(engine)
+        
+        # Testar se criou
+        with engine.connect() as conn:
+            # Verificar tabelas criadas (PostgreSQL)
+            result = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema='public'"))
+            tables = [row[0] for row in result.fetchall()]
+        
+        return jsonify({
+            "status": "success",
+            "message": "Banco PostgreSQL inicializado com sucesso!",
+            "tables_created": tables,
+            "database_type": "PostgreSQL"
+        })
+        
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "error": str(e),
+            "message": "Falha ao inicializar banco"
+        }), 500
 
 @app.route('/manual')
 def manual():
