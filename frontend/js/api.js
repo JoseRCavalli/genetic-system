@@ -3,7 +3,7 @@
  * Funções para comunicação com o backend
  */
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = window.location.origin + '/api';
 
 class API {
     /**
@@ -84,19 +84,27 @@ class API {
                 formData.append(key, additionalData[key]);
             });
             
+            console.log(`🔄 Fazendo upload para: ${API_BASE}${endpoint}`);
+            console.log(`📁 Arquivo: ${file.name} (${file.size} bytes)`);
+            
             const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
                 body: formData
             });
+            
+            console.log(`📡 Response status: ${response.status}`);
             
             if (!response.ok) {
                 const error = await response.json();
                 throw new Error(error.error || 'Erro no upload');
             }
             
-            return await response.json();
+            const result = await response.json();
+            console.log('✅ Upload concluído:', result);
+            
+            return result;
         } catch (error) {
-            console.error('Erro no upload:', error);
+            console.error('❌ Erro no upload:', error);
             throw error;
         }
     }
@@ -324,3 +332,6 @@ function getInbreedingColor(inbreeding) {
     if (inbreeding < 8.0) return 'warning';      // Amarelo: 6-8% (Atenção)
     return 'danger';                              // Vermelho: > 8% (Crítico)
 }
+
+// Debug: Mostrar URL base no console
+console.log(`🌐 API Base URL: ${API_BASE}`);
