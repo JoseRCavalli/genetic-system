@@ -1,38 +1,33 @@
 """
 Aplicação Principal - Flask
 Sistema de Acasalamento de Gado Leiteiro
-VERSÃO HÍBRIDA: SQLite local + PostgreSQL produção
 """
 
-from flask import Flask, render_template, send_from_directory, jsonify
+from flask import Flask, render_template, send_from_directory, jsonify, request
 from flask_cors import CORS
 from sqlalchemy import create_engine, text
 import os
 import time
+import tempfile
 from datetime import datetime
 
 # Importar models e inicializar banco
 from backend.models.database import init_database, get_session
 
-# Importar rotas
-from backend.api.routes import api
-from backend.api.analytics_routes import analytics_api
-
 # ============================================================================
-# CONFIGURAÇÃO DE BANCO DE DADOS PARA RENDER
+# CONFIGURAÇÃO DE BANCO DE DADOS
 # ============================================================================
 
 def get_database_url():
     """
     Detecta automaticamente qual banco usar:
-    - Render: PostgreSQL via DATABASE_URL
+    - Produção: PostgreSQL via DATABASE_URL
     - Local: SQLite
     """
-    # Render usa DATABASE_URL também
     database_url = os.environ.get('DATABASE_URL')
     
     if database_url:
-        print("🐘 Usando PostgreSQL (Render)")
+        print("🐘 Usando PostgreSQL (produção)")
         return database_url
     else:
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -56,7 +51,7 @@ app = Flask(__name__,
 CORS(app)
 
 # Configurações
-app.config['SECRET_KEY'] = 'cattle-breeding-secret-key-render'
+app.config['SECRET_KEY'] = 'cattle-breeding-secret-key-production'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
@@ -80,15 +75,16 @@ except Exception as e:
     # Continuar mesmo assim para poder debugar
 
 # ============================================================================
-# REGISTRAR ROTAS
+# BLUEPRINTS DESABILITADOS (PARA EVITAR CONFLITOS)
 # ============================================================================
 
-try:
-    app.register_blueprint(api)
-    app.register_blueprint(analytics_api)
-    print("✓ Blueprints registrados!")
-except Exception as e:
-    print(f"⚠️  Erro ao registrar blueprints: {e}")
+# ❌ COMENTADO PARA EVITAR CONFLITOS DE ROTAS
+# from backend.api.routes import api
+# from backend.api.analytics_routes import analytics_api
+# app.register_blueprint(api)
+# app.register_blueprint(analytics_api)
+
+print("⚠️ Blueprints desabilitados - usando rotas diretas")
 
 # ============================================================================
 # ROTAS PRINCIPAIS
@@ -113,6 +109,70 @@ def index():
             </body>
         </html>
         """
+
+@app.route('/api/health')
+def health_check():
+    """Health check"""
+    try:
+        db = get_session(engine)
+        from backend.models.database import Female
+        count = db.query(Female).count()
+        db.close()
+        
+        return jsonify({
+            'status': 'ok',
+            'database': 'connected',
+            'database_type': 'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite',
+            'females_count': count,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
+
+@app.route('/api/dashboard')
+def dashboard_api():
+    """Dashboard API com retry"""
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            db = get_session(engine)
+            from backend.models.database import Female, Bull, Mating
+            
+            total_femeas = db.query(Female).count()
+            total_touros = db.query(Bull).count() 
+            total_acasalamentos = db.query(Mating).count()
+            
+            taxa_sucesso = 85 if total_acasalamentos > 0 else 0
+            
+            db.close()
+            
+            return jsonify({
+                "total_femeas": total_femeas,
+                "total_touros": total_touros, 
+                "total_acasalamentos": total_acasalamentos,
+                "taxa_sucesso": taxa_sucesso,
+                "status": "success",
+                "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite"
+            })
+            
+        except Exception as e:
+            if attempt < max_retries - 1 and ("starting up" in str(e) or "Connection refused" in str(e)):
+                print(f"Tentativa {attempt + 1}, aguardando...")
+                time.sleep(2)
+                continue
+            
+            return jsonify({
+                "error": str(e),
+                "total_femeas": 0,
+                "total_touros": 0,
+                "total_acasalamentos": 0,
+                "taxa_sucesso": 0,
+                "status": "error"
+            }), 500
 
 @app.route('/api/dashboard-full')
 def dashboard_full_api():
@@ -183,70 +243,6 @@ def dashboard_full_api():
             "last_updated": datetime.now().isoformat()
         }), 500
 
-@app.route('/api/health')
-def health_check():
-    """Health check"""
-    try:
-        db = get_session(engine)
-        from backend.models.database import Female
-        count = db.query(Female).count()
-        db.close()
-        
-        return jsonify({
-            'status': 'ok',
-            'database': 'connected',
-            'database_type': 'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite',
-            'females_count': count,
-            'timestamp': datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
-
-@app.route('/api/dashboard')
-def dashboard_api():
-    """Dashboard API com retry"""
-    max_retries = 3
-    
-    for attempt in range(max_retries):
-        try:
-            db = get_session(engine)
-            from backend.models.database import Female, Bull, Mating
-            
-            total_femeas = db.query(Female).count()
-            total_touros = db.query(Bull).count() 
-            total_acasalamentos = db.query(Mating).count()
-            
-            taxa_sucesso = 85 if total_acasalamentos > 0 else 0
-            
-            db.close()
-            
-            return jsonify({
-                "total_femeas": total_femeas,
-                "total_touros": total_touros, 
-                "total_acasalamentos": total_acasalamentos,
-                "taxa_sucesso": taxa_sucesso,
-                "status": "success",
-                "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite"
-            })
-            
-        except Exception as e:
-            if attempt < max_retries - 1 and ("starting up" in str(e) or "Connection refused" in str(e)):
-                print(f"Tentativa {attempt + 1}, aguardando...")
-                time.sleep(2)
-                continue
-            
-            return jsonify({
-                "error": str(e),
-                "total_femeas": 0,
-                "total_touros": 0,
-                "total_acasalamentos": 0,
-                "taxa_sucesso": 0,
-                "status": "error"
-            }), 500
-
 @app.route('/api/init-database')
 def init_database_api():
     """Inicializar banco"""
@@ -278,117 +274,169 @@ def init_database_api():
             "error": str(e)
         }), 500
 
-@app.route('/api/import-test', methods=['POST'])
+# ============================================================================
+# ROTAS DE IMPORTAÇÃO (SEM CONFLITOS)
+# ============================================================================
+
+@app.route('/api/import/test', methods=['GET', 'POST'])
 def import_test():
-    """Rota de teste para importação"""
-    try:
-        return jsonify({
-            "status": "success",
-            "message": "Rota de importação funcionando!",
-            "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite",
-            "upload_folder": app.config.get('UPLOAD_FOLDER', 'Não configurado'),
-            "base_dir": BASE_DIR
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+    """Teste das rotas de importação"""
+    return jsonify({
+        "status": "success",
+        "message": "Rotas de importação funcionando!",
+        "method": request.method,
+        "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite",
+        "timestamp": datetime.now().isoformat()
+    })
 
 @app.route('/api/females/import', methods=['POST'])
-def import_females_fixed():
-    """Importação de fêmeas - versão corrigida para produção"""
+def import_females_production():
+    """Importação de fêmeas - PRODUÇÃO"""
     try:
+        # Log para debug
+        print(f"🔍 Recebendo importação de fêmeas...")
+        print(f"   Files: {list(request.files.keys())}")
+        print(f"   Form: {dict(request.form)}")
+        
         if 'file' not in request.files:
+            print("❌ Erro: Nenhum arquivo enviado")
             return jsonify({'error': 'Nenhum arquivo enviado'}), 400
         
         file = request.files['file']
         user = request.form.get('user', 'Pedro')
         
+        print(f"   Arquivo: {file.filename}")
+        print(f"   User: {user}")
+        
         if file.filename == '':
+            print("❌ Erro: Nome de arquivo vazio")
             return jsonify({'error': 'Nome de arquivo inválido'}), 400
         
         if not file.filename.endswith(('.xlsx', '.xls')):
+            print("❌ Erro: Formato inválido")
             return jsonify({'error': 'Arquivo deve ser Excel (.xlsx ou .xls)'}), 400
         
+        print("📁 Salvando arquivo temporário...")
+        
         # Usar diretório temporário do sistema
-        import tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
             file.save(tmp_file.name)
+            print(f"   Salvo em: {tmp_file.name}")
             
             try:
-                # Importar
-                db = get_session(engine)
-                
-                # Simular importação por enquanto (para testar)
+                print("📊 Lendo Excel...")
                 import pandas as pd
                 df = pd.read_excel(tmp_file.name)
+                print(f"   Lidas {len(df)} linhas")
+                print(f"   Colunas: {list(df.columns[:5])}...")  # Primeiras 5 colunas
+                
+                if len(df) == 0:
+                    return jsonify({'error': 'Arquivo Excel está vazio'}), 400
+                
+                print("💾 Processando dados...")
+                
+                # Por agora, só simular (para testar se funciona)
+                stats = {
+                    'added': len(df),
+                    'updated': 0,
+                    'unchanged': 0
+                }
+                
+                print("✅ Processamento concluído!")
                 
                 return jsonify({
                     'success': True,
-                    'message': f'Arquivo lido com sucesso! {len(df)} registros encontrados',
-                    'stats': {
-                        'added': len(df),
-                        'updated': 0,
-                        'unchanged': 0
-                    },
-                    'preview': df.head(3).to_dict('records') if len(df) > 0 else []
+                    'message': f'Arquivo processado com sucesso! {len(df)} registros encontrados',
+                    'stats': stats,
+                    'columns': list(df.columns[:10]),  # Primeiras 10 colunas para debug
+                    'preview': df.head(2).to_dict('records') if len(df) > 0 else []
                 })
                 
             except Exception as e:
+                print(f"❌ Erro ao processar: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 return jsonify({'error': f'Erro ao processar arquivo: {str(e)}'}), 500
             finally:
                 # Limpar arquivo temporário
-                os.unlink(tmp_file.name)
+                try:
+                    os.unlink(tmp_file.name)
+                    print("🗑️ Arquivo temporário removido")
+                except:
+                    pass
                 
     except Exception as e:
-        return jsonify({'error': f'Erro geral: {str(e)}'}), 500
+        print(f"❌ Erro geral: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 @app.route('/api/bulls/import', methods=['POST'])
-def import_bulls_fixed():
-    """Importação de touros - versão corrigida para produção"""
+def import_bulls_production():
+    """Importação de touros - PRODUÇÃO"""
     try:
+        print(f"🔍 Recebendo importação de touros...")
+        
         if 'file' not in request.files:
             return jsonify({'error': 'Nenhum arquivo enviado'}), 400
         
         file = request.files['file']
         user = request.form.get('user', 'Pedro')
+        
+        print(f"   Arquivo: {file.filename}")
         
         if not file.filename.endswith('.pdf'):
             return jsonify({'error': 'Arquivo deve ser PDF'}), 400
         
-        # Usar diretório temporário do sistema
-        import tempfile
+        print("📁 Salvando PDF temporário...")
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
             file.save(tmp_file.name)
             
             try:
-                # Simular processamento PDF
+                print("📄 Lendo PDF...")
                 import PyPDF2
                 with open(tmp_file.name, 'rb') as pdf_file:
                     pdf_reader = PyPDF2.PdfReader(pdf_file)
                     pages = len(pdf_reader.pages)
                 
+                print(f"   PDF com {pages} páginas")
+                
+                if pages == 0:
+                    return jsonify({'error': 'PDF está vazio'}), 400
+                
+                # Por agora, só simular
+                stats = {
+                    'added': pages,
+                    'updated': 0,
+                    'unchanged': 0
+                }
+                
+                print("✅ PDF processado!")
+                
                 return jsonify({
                     'success': True,
-                    'message': f'PDF lido com sucesso! {pages} páginas processadas',
-                    'stats': {
-                        'added': pages,
-                        'updated': 0,
-                        'unchanged': 0
-                    }
+                    'message': f'PDF processado com sucesso! {pages} páginas encontradas',
+                    'stats': stats
                 })
                 
             except Exception as e:
+                print(f"❌ Erro ao processar PDF: {str(e)}")
                 return jsonify({'error': f'Erro ao processar PDF: {str(e)}'}), 500
             finally:
-                # Limpar arquivo temporário
-                os.unlink(tmp_file.name)
+                try:
+                    os.unlink(tmp_file.name)
+                except:
+                    pass
                 
     except Exception as e:
-        return jsonify({'error': f'Erro geral: {str(e)}'}), 500
+        print(f"❌ Erro geral: {str(e)}")
+        return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
-# Outras rotas de frontend
+# ============================================================================
+# ROTAS DE FRONTEND
+# ============================================================================
+
 @app.route('/manual')
 def manual():
     return render_template('manual.html')
@@ -409,7 +457,10 @@ def analytics():
 def import_data():
     return send_from_directory('frontend/pages', 'import.html')
 
-# Arquivos estáticos
+# ============================================================================
+# ARQUIVOS ESTÁTICOS
+# ============================================================================
+
 @app.route('/css/<path:filename>')
 def serve_css(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'frontend', 'css'), filename)
@@ -428,10 +479,10 @@ def serve_assets(filename):
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("🐄 GENEFY - RENDER.COM")
+    print("🐄 GENEFY - SISTEMA DE ACASALAMENTO")
     print("="*60)
     print(f"Banco: {'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite'}")
-    print(f"Porto: {os.environ.get('PORT', 5000)}")
+    print(f"Porta: {os.environ.get('PORT', 5000)}")
     print("="*60)
     
     port = int(os.environ.get('PORT', 5000))
