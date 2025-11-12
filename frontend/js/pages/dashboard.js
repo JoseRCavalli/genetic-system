@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadDashboard() {
     try {
-        const data = await API.getDashboard();
+        const data = await fetch('/api/dashboard-full').then(r => r.json());
         
         // Atualizar estatísticas
         updateStats(data.summary);
