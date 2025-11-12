@@ -9,6 +9,7 @@ from flask_cors import CORS
 from sqlalchemy import create_engine, text
 import os
 from datetime import datetime
+import time
 
 # Importar models e inicializar banco
 from backend.models.database import init_database, get_session
@@ -96,29 +97,27 @@ def index():
 
 @app.route('/api/dashboard')
 def dashboard_api():
-    """API do dashboard - retorna estatísticas gerais"""
-    try:
-        # Usar a mesma conexão configurada
-        dashboard_engine = create_engine(DB_URL, echo=False)
-        
-        with dashboard_engine.connect() as conn:
-            # Contar fêmeas
-            result_femeas = conn.execute(text("SELECT COUNT(*) as total FROM females"))
-            total_femeas = result_femeas.fetchone()[0]
+    """API do dashboard - com retry para PostgreSQL"""
+    
+    max_retries = 5
+    retry_delay = 2  # segundos
+    
+    for attempt in range(max_retries):
+        try:
+            # Usar sessão do SQLAlchemy
+            db = get_session(engine)
             
-            # Contar touros  
-            result_touros = conn.execute(text("SELECT COUNT(*) as total FROM bulls"))
-            total_touros = result_touros.fetchone()[0]
+            from backend.models.database import Female, Bull, Mating
             
-            # Contar acasalamentos (se a tabela existir)
-            try:
-                result_matings = conn.execute(text("SELECT COUNT(*) as total FROM matings"))
-                total_acasalamentos = result_matings.fetchone()[0]
-            except:
-                total_acasalamentos = 0
+            # Contar usando SQLAlchemy
+            total_femeas = db.query(Female).count()
+            total_touros = db.query(Bull).count() 
+            total_acasalamentos = db.query(Mating).count()
             
-            # Calcular taxa de sucesso (placeholder)
+            # Calcular taxa de sucesso
             taxa_sucesso = 85 if total_acasalamentos > 0 else 0
+            
+            db.close()
             
             return jsonify({
                 "total_femeas": total_femeas,
@@ -126,18 +125,42 @@ def dashboard_api():
                 "total_acasalamentos": total_acasalamentos,
                 "taxa_sucesso": taxa_sucesso,
                 "status": "success",
-                "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite"
+                "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite",
+                "attempt": attempt + 1
             })
             
-    except Exception as e:
-        print(f"Erro na dashboard API: {str(e)}")
-        return jsonify({
-            "error": str(e),
-            "total_femeas": 0,
-            "total_touros": 0,
-            "total_acasalamentos": 0,
-            "taxa_sucesso": 0
-        }), 500
+        except Exception as e:
+            error_msg = str(e)
+            
+            # Se é erro de "database system is starting up", tenta novamente
+            if "starting up" in error_msg or "Connection refused" in error_msg:
+                if attempt < max_retries - 1:  # Não é a última tentativa
+                    print(f"PostgreSQL starting up, attempt {attempt + 1}/{max_retries}, waiting {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    continue
+            
+            # Erro definitivo ou última tentativa
+            print(f"Erro na dashboard API: {error_msg}")
+            
+            return jsonify({
+                "error": error_msg,
+                "total_femeas": 0,
+                "total_touros": 0,
+                "total_acasalamentos": 0,
+                "taxa_sucesso": 0,
+                "status": "error",
+                "attempt": attempt + 1
+            }), 500
+    
+    # Se chegou aqui, todas as tentativas falharam
+    return jsonify({
+        "error": "PostgreSQL não conseguiu inicializar após múltiplas tentativas",
+        "total_femeas": 0,
+        "total_touros": 0,
+        "total_acasalamentos": 0,
+        "taxa_sucesso": 0,
+        "status": "timeout"
+    }), 500
 
 @app.route('/api/init-database')
 def init_database_api():
