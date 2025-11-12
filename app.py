@@ -114,6 +114,75 @@ def index():
         </html>
         """
 
+@app.route('/api/dashboard-full')
+def dashboard_full_api():
+    """API completa do dashboard - compatível com o frontend"""
+    try:
+        db = get_session(engine)
+        from backend.models.database import Female, Bull, Mating
+        
+        # Estatísticas básicas
+        total_females = db.query(Female).count()
+        active_females = db.query(Female).filter(Female.is_active == True).count()
+        total_bulls = db.query(Bull).count()
+        available_bulls = db.query(Bull).filter(Bull.is_available == True).count()
+        total_matings = db.query(Mating).count()
+        
+        # Médias do rebanho (simples por agora)
+        avg_milk = db.query(Female.milk).filter(Female.milk.isnot(None)).all()
+        avg_pl = db.query(Female.productive_life).filter(Female.productive_life.isnot(None)).all()
+        avg_inb = db.query(Female.genomic_inbreeding).filter(Female.genomic_inbreeding.isnot(None)).all()
+        
+        # Calcular médias
+        milk_avg = sum(x[0] for x in avg_milk) / len(avg_milk) if avg_milk else 0
+        pl_avg = sum(x[0] for x in avg_pl) / len(avg_pl) if avg_pl else 0
+        inb_avg = sum(x[0] for x in avg_inb) / len(avg_inb) if avg_inb else 0
+        
+        # Top touros (placeholder)
+        top_bulls = []
+        
+        db.close()
+        
+        return jsonify({
+            "summary": {
+                "total_females": total_females,
+                "active_females": active_females,
+                "total_bulls": total_bulls,
+                "available_bulls": available_bulls,
+                "total_matings": total_matings,
+                "recent_matings": 0,  # placeholder
+                "success_rate": 85.0  # placeholder
+            },
+            "herd_averages": {
+                "milk": round(milk_avg, 0),
+                "productive_life": round(pl_avg, 2),
+                "genomic_inbreeding": round(inb_avg, 2)
+            },
+            "top_bulls": top_bulls,
+            "last_updated": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"Erro na dashboard full API: {str(e)}")
+        return jsonify({
+            "summary": {
+                "total_females": 0,
+                "active_females": 0,
+                "total_bulls": 0,
+                "available_bulls": 0,
+                "total_matings": 0,
+                "recent_matings": 0,
+                "success_rate": 0
+            },
+            "herd_averages": {
+                "milk": 0,
+                "productive_life": 0,
+                "genomic_inbreeding": 0
+            },
+            "top_bulls": [],
+            "last_updated": datetime.now().isoformat()
+        }), 500
+
 @app.route('/api/health')
 def health_check():
     """Health check"""
