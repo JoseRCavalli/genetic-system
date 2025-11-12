@@ -68,6 +68,51 @@ def index():
     """Página principal - Dashboard"""
     return render_template('index.html')
 
+@app.route('/api/dashboard')
+def dashboard_api():
+    """API do dashboard - retorna estatísticas gerais"""
+    try:
+        # Conectar com banco
+        engine = create_engine(f'sqlite:///{os.path.join(BASE_DIR, "database", "cattle_breeding.db")}', 
+                             echo=False)
+        
+        with engine.connect() as conn:
+            # Contar fêmeas
+            result_femeas = conn.execute(text("SELECT COUNT(*) as total FROM females"))
+            total_femeas = result_femeas.fetchone()[0]
+            
+            # Contar touros  
+            result_touros = conn.execute(text("SELECT COUNT(*) as total FROM bulls"))
+            total_touros = result_touros.fetchone()[0]
+            
+            # Contar acasalamentos (se a tabela existir)
+            try:
+                result_matings = conn.execute(text("SELECT COUNT(*) as total FROM matings"))
+                total_acasalamentos = result_matings.fetchone()[0]
+            except:
+                total_acasalamentos = 0
+            
+            # Calcular taxa de sucesso (placeholder)
+            taxa_sucesso = 85 if total_acasalamentos > 0 else 0
+            
+            return jsonify({
+                "total_femeas": total_femeas,
+                "total_touros": total_touros, 
+                "total_acasalamentos": total_acasalamentos,
+                "taxa_sucesso": taxa_sucesso,
+                "status": "success"
+            })
+            
+    except Exception as e:
+        print(f"Erro na dashboard API: {str(e)}")
+        return jsonify({
+            "error": str(e),
+            "total_femeas": 0,
+            "total_touros": 0,
+            "total_acasalamentos": 0,
+            "taxa_sucesso": 0
+        }), 500
+
 
 @app.route('/manual')
 def manual():
