@@ -1,11 +1,12 @@
 """
 Aplicação Principal - Flask
 Sistema de Acasalamento de Gado Leiteiro
-VERSÃO WINDOWS
+VERSÃO WINDOWS - CORRIGIDA PARA RAILWAY
 """
 
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, send_from_directory, jsonify
 from flask_cors import CORS
+from sqlalchemy import create_engine, text
 import os
 from datetime import datetime
 
@@ -73,10 +74,10 @@ def dashboard_api():
     """API do dashboard - retorna estatísticas gerais"""
     try:
         # Conectar com banco
-        engine = create_engine(f'sqlite:///{os.path.join(BASE_DIR, "database", "cattle_breeding.db")}', 
+        dashboard_engine = create_engine(f'sqlite:///{os.path.join(BASE_DIR, "database", "cattle_breeding.db")}', 
                              echo=False)
         
-        with engine.connect() as conn:
+        with dashboard_engine.connect() as conn:
             # Contar fêmeas
             result_femeas = conn.execute(text("SELECT COUNT(*) as total FROM females"))
             total_femeas = result_femeas.fetchone()[0]
@@ -260,8 +261,8 @@ def import_initial_data():
         try:
             stats_bulls = importer.import_bulls_from_pdf(bulls_file, 'Sistema')
             print(f"   ✓ Touros importados:")
-            print(f"      Adicionados: {stats_bulls['added']}")
-            print(f"      Atualizados: {stats_bulls['updated']}")
+            print(f"      Adicionadas: {stats_bulls['added']}")
+            print(f"      Atualizadas: {stats_bulls['updated']}")
             print(f"      Sem mudanças: {stats_bulls['unchanged']}")
         except Exception as e:
             print(f"   ✗ Erro: {e}")
