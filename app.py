@@ -1,7 +1,7 @@
 """
 Aplicação Principal - Flask
 Sistema de Acasalamento de Gado Leiteiro
-VERSÃO WINDOWS - CORRIGIDA PARA RAILWAY
+VERSÃO HÍBRIDA: SQLite local + PostgreSQL produção
 """
 
 from flask import Flask, render_template, send_from_directory, jsonify
@@ -16,6 +16,31 @@ from backend.models.database import init_database, get_session
 # Importar rotas
 from backend.api.routes import api
 from backend.api.analytics_routes import analytics_api
+
+# ============================================================================
+# CONFIGURAÇÃO DE BANCO DE DADOS INTELIGENTE
+# ============================================================================
+
+def get_database_url():
+    """
+    Detecta automaticamente qual banco usar:
+    - Produção (Railway): PostgreSQL via DATABASE_URL
+    - Local: SQLite
+    """
+    # Se existe DATABASE_URL (Railway PostgreSQL)
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if database_url:
+        # PostgreSQL no Railway
+        print("🐘 Usando PostgreSQL (produção)")
+        return database_url
+    else:
+        # SQLite local
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_dir, 'database', 'cattle_breeding.db')
+        sqlite_url = f'sqlite:///{db_path}'
+        print("🗃️  Usando SQLite (desenvolvimento)")
+        return sqlite_url
 
 # ============================================================================
 # CONFIGURAÇÃO
@@ -37,20 +62,20 @@ app.config['SECRET_KEY'] = 'cattle-breeding-secret-key-change-in-production'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max upload
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
-# Garantir que pastas existem
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
+# Garantir que pastas existem (só para SQLite local)
+if not os.environ.get('DATABASE_URL'):
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'database'), exist_ok=True)
 
 # ============================================================================
 # INICIALIZAÇÃO DO BANCO DE DADOS
 # ============================================================================
 
-# Path do banco (Windows compatível)
-DB_PATH = f'sqlite:///{os.path.join(BASE_DIR, "database", "cattle_breeding.db")}'
+DB_URL = get_database_url()
 
 print("Inicializando banco de dados...")
-print(f"Localização: {DB_PATH}")
-engine = init_database(DB_PATH)
+print(f"Localização: {DB_URL}")
+engine = init_database(DB_URL)
 print("✓ Banco de dados pronto!")
 
 # ============================================================================
@@ -73,9 +98,8 @@ def index():
 def dashboard_api():
     """API do dashboard - retorna estatísticas gerais"""
     try:
-        # Conectar com banco
-        dashboard_engine = create_engine(f'sqlite:///{os.path.join(BASE_DIR, "database", "cattle_breeding.db")}', 
-                             echo=False)
+        # Usar a mesma conexão configurada
+        dashboard_engine = create_engine(DB_URL, echo=False)
         
         with dashboard_engine.connect() as conn:
             # Contar fêmeas
@@ -101,7 +125,8 @@ def dashboard_api():
                 "total_touros": total_touros, 
                 "total_acasalamentos": total_acasalamentos,
                 "taxa_sucesso": taxa_sucesso,
-                "status": "success"
+                "status": "success",
+                "database_type": "PostgreSQL" if os.environ.get('DATABASE_URL') else "SQLite"
             })
             
     except Exception as e:
@@ -206,10 +231,10 @@ def init_db():
     print("Criando tabelas do banco de dados...")
     print("="*80)
     
-    engine = init_database(DB_PATH)
+    engine = init_database(DB_URL)
     
     print("\n✓ Banco de dados inicializado com sucesso!")
-    print(f"  Localização: {os.path.join(BASE_DIR, 'database', 'cattle_breeding.db')}")
+    print(f"  Localização: {DB_URL}")
     print("="*80 + "\n")
 
 
@@ -227,6 +252,12 @@ def import_initial_data():
     
     # Procurar arquivos na pasta uploads
     uploads_dir = app.config['UPLOAD_FOLDER']
+    
+    # Só funciona em ambiente local (SQLite)
+    if os.environ.get('DATABASE_URL'):
+        print("⚠️  Comando não disponível em produção (PostgreSQL)")
+        print("   Use a interface web para importar dados")
+        return
     
     # Importar fêmeas
     print("\n1. Procurando arquivo de fêmeas...")
@@ -291,6 +322,8 @@ def health_check():
         return {
             'status': 'ok',
             'database': 'connected',
+            'database_type': 'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite',
+            'database_url': DB_URL.split('@')[0] + '@***' if '@' in DB_URL else 'SQLite local',
             'females_count': count,
             'timestamp': datetime.now().isoformat()
         }
@@ -317,6 +350,7 @@ def api_status():
             'status': 'online',
             'version': '2.0',
             'database': {
+                'type': 'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite',
                 'females': females_count,
                 'bulls': bulls_count,
                 'matings': matings_count
@@ -341,7 +375,8 @@ if __name__ == '__main__':
     print("  🐄 SISTEMA DE ACASALAMENTO - GADO LEITEIRO 🐄")
     print("="*80)
     print(f"\nDiretório base: {BASE_DIR}")
-    print(f"Banco de dados: {os.path.join(BASE_DIR, 'database', 'cattle_breeding.db')}")
+    print(f"Banco de dados: {DB_URL}")
+    print(f"Tipo de banco: {'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite'}")
     print(f"Uploads: {app.config['UPLOAD_FOLDER']}")
     print(f"\nIniciando servidor...")
     print(f"Data/Hora: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
